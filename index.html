@@ -105,6 +105,7 @@
     </div>
 
 <script>
+    // আপনার দেওয়া Google Script URL
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzDIldLwwMTnbKYxXvkXMJAFTcFAjG_GZRvNuxpUZOPUFacbq0awcUShqeTt9wCQABwIQ/exec";
     
     let history = JSON.parse(localStorage.getItem('smart_hisab_v34')) || [];
@@ -122,11 +123,24 @@
     window.addEventListener('online', attemptSync);
 
     function checkPin() {
-        if(document.getElementById('pin-input').value === userPin) document.getElementById('pin-screen').style.display = 'none';
-        else document.getElementById('pin-msg').innerText = "ভুল PIN!";
+        if(document.getElementById('pin-input').value === userPin) {
+            document.getElementById('pin-screen').style.display = 'none';
+        } else {
+            document.getElementById('pin-msg').innerText = "ভুল PIN!";
+        }
     }
 
-    // বিবরণ পরিবর্তনের ফাংশন
+    // তারিখ ফরম্যাট করার ফাংশন (15-Feb-2026)
+    function formatDateBN(dateStr) {
+        if (!dateStr) return "";
+        const d = new Date(dateStr);
+        const day = d.getDate().toString().padStart(2, '0');
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const month = months[d.getMonth()];
+        const year = d.getFullYear();
+        return `${day}-${month}-${year}`;
+    }
+
     function updatePlaceholder() {
         const type = document.getElementById('type').value;
         const titleInput = document.getElementById('title');
@@ -169,7 +183,6 @@
 
         let calcInc = 0, calcExp = 0;
 
-        // ক্যালকুলেশন লজিক
         history.forEach(item => {
             const d = new Date(item.date);
             const isToday = item.date === todayStr;
@@ -177,7 +190,7 @@
             const isYearly = d.getFullYear() == selY;
 
             let match = false;
-            if(currentView === 'today') match = true; // ড্যাশবোর্ডে সবসময় সর্বমোট দেখাবে
+            if(currentView === 'today' && isToday) match = true;
             else if(currentView === 'monthly' && isMonthly) match = true;
             else if(currentView === 'yearly' && isYearly) match = true;
 
@@ -203,7 +216,7 @@
         listData.forEach(item => {
             const typeText = (item.type === 'income') ? 'আয়' : 'ব্যয়';
             list.innerHTML += `<div class="item" style="border-left-color: ${item.type==='income'?'green':'red'}">
-                <div><b>${item.title}</b><br><small style="color:#888">${item.date}</small></div>
+                <div><b>${item.title}</b><br><small style="color:#888">${formatDateBN(item.date)}</small></div>
                 <div style="text-align:right">
                     <div style="color:${item.type==='income'?'green':'red'}; font-weight:bold">${typeText} ৳${item.amount}</div>
                     <span style="color:#ff4d4d; font-size:11px; cursor:pointer;" onclick="deleteWithPin('${item.id}')">মুছুন</span>
@@ -250,6 +263,7 @@
         statusEl.innerText = "সিঙ্ক হচ্ছে...";
         
         try {
+            // Bulk sync data to Google Sheets
             await fetch(SCRIPT_URL, {
                 method: 'POST',
                 mode: 'no-cors',
