@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>স্মার্ট হিসাব - ডাইনামিক বিবরণ</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-pink: #e91e63; --header-cyan: #80ced6; --income-green: #0e8a16;
+            --expense-red: #c90a4d; --balance-teal: #008080; --bg-light: #f3f4f6;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: var(--primary-pink); margin: 0; padding: 0; display: flex; justify-content: center; min-height: 100vh; }
+        .app-container { width: 100vw; max-width: 450px; background-color: var(--bg-light); min-height: 100vh; display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0,0,0,0.3); }
+        
+        #pin-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--balance-teal); z-index: 3000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
+        #pin-input { width: 150px; padding: 12px; text-align: center; font-size: 28px; border: none; border-radius: 12px; margin-bottom: 20px; outline: none; }
+        .pin-btn { width: 150px; background: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; color: var(--balance-teal); cursor: pointer; }
+
+        .header { background-color: var(--header-cyan); padding: 15px; text-align: center; font-weight: bold; font-size: 20px; position: relative; }
+        .menu-icon { position: absolute; right: 15px; top: 12px; font-size: 28px; cursor: pointer; color: #333; }
+        
+        .side-menu { position: fixed; top: 0; right: -280px; width: 250px; height: 100%; background: white; z-index: 2000; transition: 0.4s; padding: 20px; display: flex; flex-direction: column; gap: 10px; box-shadow: -5px 0 15px rgba(0,0,0,0.2); }
+        .side-menu.active { right: 0; }
+        .menu-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1500; display: none; }
+        .menu-item { background: #f1f3f5; padding: 14px; border-radius: 12px; font-size: 14px; text-align: center; cursor: pointer; border: 1px solid #dee2e6; font-weight: 600; color: #333; display: block; text-decoration: none; }
+
+        .dashboard { padding: 15px; display: flex; gap: 8px; }
+        .card { border-radius: 12px; padding: 10px; color: white; text-align: center; flex: 1; }
+        .balance-card { flex: 0.8; background-color: var(--balance-teal); border-radius: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; }
+        
+        .input-section { padding: 15px; background: white; margin: 0 10px 10px; border-radius: 15px; }
+        input, select, .save-btn { width: 100%; padding: 12px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 10px; font-size: 14px; outline: none; }
+        .save-btn { background: #2196f3; color: white; font-weight: bold; border: none; cursor: pointer; }
+        
+        .tabs { display: flex; background: #fff; border-bottom: 1px solid #ddd; }
+        .tab-btn { flex: 1; padding: 15px; border: none; background: none; font-weight: bold; color: #666; cursor: pointer; font-size: 14px; }
+        .tab-btn.active { color: var(--primary-pink); border-bottom: 3px solid var(--primary-pink); }
+
+        #filter-container { background: #eee; padding: 10px; display: none; gap: 5px; justify-content: center; }
+        #filter-container select { padding: 8px; border-radius: 8px; border: 1px solid #ccc; font-size: 13px; }
+
+        .list-container { padding: 10px 15px; flex-grow: 1; overflow-y: auto; }
+        .item { background: white; padding: 12px; border-radius: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 6px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body>
+
+    <div id="pin-screen">
+        <h3 style="margin-bottom: 20px;">PIN কোড দিন</h3>
+        <input type="password" id="pin-input" placeholder="••••" maxlength="4">
+        <button class="pin-btn" onclick="checkPin()">প্রবেশ</button>
+        <p id="pin-msg" style="color: #ffeb3b; margin-top: 15px; font-weight: bold;"></p>
+    </div>
+
+    <div class="app-container">
+        <div class="header">আমার স্মার্ট হিসাব <div class="menu-icon" onclick="toggleMenu()">☰</div></div>
+
+        <div class="menu-overlay" id="overlay" onclick="toggleMenu()"></div>
+        <div class="side-menu" id="sideMenu">
+            <div style="font-size: 18px; color: var(--primary-pink); border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 10px; font-weight: bold; text-align: center;">সেটিংস</div>
+            <button class="menu-item" onclick="exportToExcel(); toggleMenu()">Excel ডাউনলোড</button>
+            <button class="menu-item" onclick="createBackup(); toggleMenu()">ব্যাকআপ ফাইল (JSON)</button>
+            <label class="menu-item">রিস্টোর করুন <input type="file" style="display:none" onchange="restoreBackup(event); toggleMenu()"></label>
+            <button class="menu-item" onclick="setNewPin(); toggleMenu()">PIN পরিবর্তন</button>
+        </div>
+
+        <div class="dashboard">
+            <div style="flex:1.2; display:flex; flex-direction:column; gap:8px;">
+                <div class="card" style="background: var(--income-green);"><small id="inc-lbl">আয়</small><br><b id="total-income">৳0</b></div>
+                <div class="card" style="background: var(--expense-red);"><small id="exp-lbl">ব্যয়</small><br><b id="total-expense">৳0</b></div>
+            </div>
+            <div class="balance-card"><small id="bal-lbl">অবশিষ্ট</small><br><b id="total-balance" style="font-size: 22px;">৳0</b></div>
+        </div>
+
+        <div class="input-section">
+            <input type="date" id="date-input">
+            <select id="type" onchange="updatePlaceholder()">
+                <option value="income">আয় (+)</option>
+                <option value="expense">ব্যয় (-)</option>
+            </select>
+            <input type="number" id="amount" placeholder="টাকার পরিমাণ">
+            <input type="text" id="title" placeholder="আয়ের বিবরণ">
+            <button class="save-btn" onclick="addEntry()">সংরক্ষণ করুন</button>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" id="btn-today" onclick="setView('today')">আজকের</button>
+            <button class="tab-btn" id="btn-monthly" onclick="setView('monthly')">মাসিক</button>
+            <button class="tab-btn" id="btn-yearly" onclick="setView('yearly')">বাৎসরিক</button>
+        </div>
+
+        <div id="filter-container">
+            <select id="filter-month" onchange="render()"></select>
+            <select id="filter-year" onchange="render()"></select>
+        </div>
+
+        <div class="list-container" id="list"></div>
+    </div>
+
+<script>
+    let history = JSON.parse(localStorage.getItem('smart_hisab_v34')) || [];
+    let userPin = localStorage.getItem('app_pin') || "1234"; 
+    let currentView = 'today';
+
+    // বিবরণ পরিবর্তনের ফাংশন
+    function updatePlaceholder() {
+        const type = document.getElementById('type').value;
+        const titleInput = document.getElementById('title');
+        if(type === 'income') {
+            titleInput.placeholder = "আয়ের বিবরণ";
+        } else {
+            titleInput.placeholder = "ব্যয়ের বিবরণ";
+        }
+    }
+
+    function checkPin() {
+        if(document.getElementById('pin-input').value === userPin) document.getElementById('pin-screen').style.display = 'none';
+        else document.getElementById('pin-msg').innerText = "ভুল PIN!";
+    }
+
+    window.addEventListener('load', () => {
+        document.getElementById('date-input').valueAsDate = new Date();
+        initFilters();
+        render();
+    });
+
+    function formatDate(dateStr) {
+        const d = new Date(dateStr);
+        const day = d.getDate();
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        return `${day}-${months[d.getMonth()]}-${d.getFullYear()}`;
+    }
+
+    function initFilters() {
+        const monthSel = document.getElementById('filter-month');
+        const yearSel = document.getElementById('filter-year');
+        const monthsBN = ["জানুয়ারি","ফেব্রুয়ারি","মার্চ","এপ্রিল","মে","জুন","জুলাই","আগস্ট","সেপ্টেম্বর","অক্টোবর","নভেম্বর","ডিসেম্বর"];
+        monthsBN.forEach((m, i) => {
+            let opt = new Option(m, i);
+            if(i === new Date().getMonth()) opt.selected = true;
+            monthSel.add(opt);
+        });
+        for(let i = 2024; i <= 2035; i++) {
+            let opt = new Option(i, i);
+            if(i === new Date().getFullYear()) opt.selected = true;
+            yearSel.add(opt);
+        }
+    }
+
+    function setView(v) {
+        currentView = v;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + v).classList.add('active');
+        const filterBox = document.getElementById('filter-container');
+        if(v === 'today') filterBox.style.display = 'none';
+        else if(v === 'monthly') { filterBox.style.display = 'flex'; document.getElementById('filter-month').style.display = 'inline-block'; }
+        else if(v === 'yearly') { filterBox.style.display = 'flex'; document.getElementById('filter-month').style.display = 'none'; }
+        render();
+    }
+
+    function render() {
+        const list = document.getElementById('list');
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+        const selM = document.getElementById('filter-month').value;
+        const selY = document.getElementById('filter-year').value;
+
+        let calcInc = 0, calcExp = 0;
+
+        if (currentView === 'today') {
+            history.forEach(item => {
+                if(item.type === 'income') calcInc += item.amount;
+                else calcExp += item.amount;
+            });
+            document.getElementById('inc-lbl').innerText = 'সর্বমোট আয়';
+            document.getElementById('exp-lbl').innerText = 'সর্বমোট ব্যয়';
+            document.getElementById('bal-lbl').innerText = 'মোট অবশিষ্ট';
+        } else {
+            const filteredData = history.filter(item => {
+                const d = new Date(item.date);
+                if(currentView === 'monthly') return d.getMonth() == selM && d.getFullYear() == selY;
+                if(currentView === 'yearly') return d.getFullYear() == selY;
+                return true;
+            });
+            filteredData.forEach(item => {
+                if(item.type === 'income') calcInc += item.amount;
+                else calcExp += item.amount;
+            });
+            document.getElementById('inc-lbl').innerText = (currentView==='monthly'?'মাসিক ':'বাৎসরিক ') + 'আয়';
+            document.getElementById('exp-lbl').innerText = (currentView==='monthly'?'মাসিক ':'বাৎসরিক ') + 'ব্যয়';
+            document.getElementById('bal-lbl').innerText = 'অবশিষ্ট';
+        }
+
+        document.getElementById('total-income').innerText = '৳' + calcInc.toLocaleString();
+        document.getElementById('total-expense').innerText = '৳' + calcExp.toLocaleString();
+        document.getElementById('total-balance').innerText = '৳' + (calcInc - calcExp).toLocaleString();
+
+        list.innerHTML = '';
+        const listData = history.filter(item => {
+            const d = new Date(item.date);
+            if(currentView === 'today') return item.date === todayStr;
+            if(currentView === 'monthly') return d.getMonth() == selM && d.getFullYear() == selY;
+            if(currentView === 'yearly') return d.getFullYear() == selY;
+            return true;
+        });
+
+        listData.forEach(item => {
+            const typeText = (item.type === 'income') ? 'আয় &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' : 'ব্যয় &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
+            const formattedDate = formatDate(item.date);
+            
+            list.innerHTML += `<div class="item" style="border-left-color: ${item.type==='income'?'green':'red'}">
+                <div><b>${item.title}</b><br><small style="color:#888">${formattedDate}</small></div>
+                <div style="text-align:right">
+                    <div style="color:${item.type==='income'?'green':'red'}; font-weight:bold">${typeText}৳${item.amount}</div>
+                    <span style="color:#ff4d4d; font-size:11px; cursor:pointer;" onclick="deleteWithPin('${item.id}')">মুছুন</span>
+                </div>
+            </div>`;
+        });
+        
+        localStorage.setItem('smart_hisab_v34', JSON.stringify(history));
+    }
+
+    function addEntry() {
+        const amount = parseFloat(document.getElementById('amount').value);
+        const title = document.getElementById('title').value;
+        if(!amount || !title) return alert("তথ্য দিন");
+        history.unshift({ id: Date.now().toString(), date: document.getElementById('date-input').value, type: document.getElementById('type').value, amount, title });
+        render();
+        document.getElementById('amount').value = ''; 
+        document.getElementById('title').value = '';
+    }
+
+    function deleteWithPin(id) {
+        if (prompt("ডিলিট করতে PIN দিন:") === userPin) {
+            if(confirm("মুছে ফেলবেন?")) { history = history.filter(i => i.id !== id); render(); }
+        } else { alert("ভুল PIN!"); }
+    }
+
+    function toggleMenu() {
+        const menu = document.getElementById('sideMenu');
+        document.getElementById('overlay').style.display = menu.classList.toggle('active') ? 'block' : 'none';
+    }
+    function createBackup() { const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history)); const dl = document.createElement('a'); dl.setAttribute("href", dataStr); dl.setAttribute("download", "backup.json"); dl.click(); }
+    function restoreBackup(event) { const reader = new FileReader(); reader.onload = (e) => { history = JSON.parse(e.target.result); render(); alert("রিস্টোর সফল!"); }; reader.readAsText(event.target.files[0]); }
+    function exportToExcel() { const ws = XLSX.utils.json_to_sheet(history); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Hisab"); XLSX.writeFile(wb, "Hisab.xlsx"); }
+    function setNewPin() { if(prompt("বর্তমান PIN:") === userPin) { let p = prompt("নতুন ৪ সংখ্যা:"); if(p && p.length===4) { localStorage.setItem('app_pin', p); userPin=p; alert("সেভড!"); } } }
+</script>
+</body>
+</html>
