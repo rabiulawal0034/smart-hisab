@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>আয় ব্যয়ের হিসাব</title>
+    <title>স্মার্ট হিসাব</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
@@ -424,9 +424,22 @@
         .card {
             background-color: white;
             padding: 15px;
-            border-radius: 15px;
+            border-radius: 20px;
             text-align: center;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-bottom: 4px solid;
+        }
+
+        .card:nth-child(1) { 
+            border-bottom-color: var(--income-green); 
+        }
+
+        .card:nth-child(2) { 
+            border-bottom-color: var(--expense-red); 
+        }
+
+        .card:nth-child(3) { 
+            border-bottom-color: var(--balance-teal); 
         }
 
         .card-title {
@@ -505,7 +518,8 @@
             background: white;
             margin: 10px 15px;
             padding: 15px;
-            border-radius: 15px;
+            border-radius: 20px;
+            border-bottom: 4px solid var(--header-cyan);
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
@@ -572,7 +586,7 @@
         .list-section {
             flex: 1;
             overflow-y: auto;
-            padding: 0 15px 80px;
+            padding: 0 15px 100px;
         }
 
         .item {
@@ -629,11 +643,11 @@
             font-weight: bold;
         }
 
-        /* Add Button */
+        /* Add Button - এখানেই পরিবর্তন করা হয়েছে */
         .add-btn {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
+            bottom: 30px;
+            right: 30px;
             width: 60px;
             height: 60px;
             border-radius: 50%;
@@ -644,7 +658,7 @@
             cursor: pointer;
             box-shadow: 0 4px 15px rgba(233,30,99,0.4);
             transition: 0.3s;
-            z-index: 100;
+            z-index: 999;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -738,7 +752,7 @@
     <!-- Transaction List -->
     <div class="list-section" id="list"></div>
 
-    <!-- Add Button -->
+    <!-- Add Button - এই বাটনটি সবসময় নিচে থাকবে -->
     <button class="add-btn" onclick="openEntryPanel()">+</button>
 </div>
 
